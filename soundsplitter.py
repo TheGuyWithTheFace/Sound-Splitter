@@ -15,8 +15,8 @@ import time
 # Magic constants
 # TODO: Read these from a config file instead?
 #
-# NOTE: These are currently not even used, oh well.
 SILENCE_LENGTH = .5 # Seconds of silence required to trigger a split
+# NOTE: this is currently not even used, oh well.
 PADDING = .2       # Seconds of silence to add to the beginning/end of new files
 
 def main():
@@ -37,13 +37,24 @@ def main():
     sample_width = input_file.getsampwidth()
     framerate = input_file.getframerate()
 
+    output_file = wave.open(folder_name + "/test.wav", "w")
+    output_file.setnchannels(1);
+    output_file.setsampwidth(input_file.getsampwidth());
+    output_file.setframerate(input_file.getframerate());
+
     # Scan file for whitespace
-    print(input_file.getnframes())
-    print(SILENCE_LENGTH * framerate)
-    nextBlankIndex = get_whitespace(input_file, sample_width, SILENCE_LENGTH * framerate)
+    print("Input has " + str(input_file.getnframes()) + " frames.")
+    print("Input framerate: " + str(framerate))
+    print("Whitespace Cutoff Length (in seconds): "
+            + str(SILENCE_LENGTH))
+
+    nextBlankIndex = get_whitespace(input_file, sample_width,
+            SILENCE_LENGTH * framerate)
 
     print(nextBlankIndex)
     print(nextBlankIndex / framerate)
+
+    copy_audio(input_file, output_file, 0, nextBlankIndex)
 
 def get_whitespace(audio, framewidth, frames_of_silence):
     num_frames = audio.getnframes()
@@ -53,7 +64,7 @@ def get_whitespace(audio, framewidth, frames_of_silence):
     # As long as there's still audio remaining
     while(audio.tell() < num_frames):
         frame = audio.readframes(1)
-        print(frame[0])
+
         # Check for silent place
         if( (frame[0] == 0) or (frame[1] == 0) ):
             silent_frame_count += 1
@@ -64,9 +75,16 @@ def get_whitespace(audio, framewidth, frames_of_silence):
         if(silent_frame_count == frames_of_silence):
             print("SUCCESS!")
             # For now, just split the silence. TODO use global padding constant
-            return audio.tell() - (frames_of_silence / 2)
+            return int(audio.tell() - (frames_of_silence / 2))
 
     print("silence: ",silent_frame_count)
     return -1
+
+def copy_audio(input_file, output_file, start_frame, end_frame):
+
+    num_frames = end_frame - start_frame
+    output_file.setnframes(num_frames)
+    input_file.setpos(start_frame)
+    output_file.writeframes(input_file.readframes(num_frames))
 
 main()
