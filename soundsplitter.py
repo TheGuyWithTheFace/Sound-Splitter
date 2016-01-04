@@ -10,12 +10,14 @@ import sys
 import os
 import wave
 import time
+import struct
 
 #
 # Magic constants
 # TODO: Read these from a config file instead?
 #
-SILENCE_LENGTH = .7 # Seconds of total silence to include before splitting
+SILENCE_THRESHOLD = 20
+SILENCE_LENGTH = .3 # Seconds of total silence to include before splitting
 # NOTE: this is currently not even used, oh well.
 PADDING = .2       # Seconds of silence to add to the beginning/end of new files
 
@@ -94,22 +96,32 @@ def get_whitespace(audio, framewidth, frames_of_silence):
     while(audio.tell() < num_frames):
         frame = audio.readframes(1)
         num_frames_examined += 1
-        #print(str(audio.tell()) + " | " + str(silent_frame_count))
-        #print(frame)
 
         # Check for silent place
-        if( (frame[0] == 0) or (frame[1] == 0)):
+        if(is_silent(frame)):
+            if(silent_frame_count == 0):
+                print("silent")
             silent_frame_count += 1
         else:
-            pass
-            #silent_frame_count = 0
+            if(silent_frame_count != 0):
+                print("unsilent")
+            silent_frame_count = 0
 
         if(silent_frame_count >= frames_of_silence):
-            # For now, just split the silence. TODO use global padding constant
+            # Proceed to end of silence
+            while(is_silent(audio.readframes(1))):
+                num_frames_examined += 1
+
+            print("Splitting")
             return num_frames_examined
 
     print("silence: ",silent_frame_count)
     return -1
+
+def is_silent(frame):
+    data = struct.unpack("<h", frame)
+    volume = data[0] # Would probably have to do something more for stereo
+    return (volume <= SILENCE_THRESHOLD and volume >= SILENCE_THRESHOLD * -1)
 
 # copies num_frames from input to output, starting with start_frame
 def copy_audio(input_file, output_file, start_frame, num_frames):
